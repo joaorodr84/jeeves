@@ -17,4 +17,10 @@ Every item also carries a `JEEVES-<n>` ID, registered in [TASKS.md](TASKS.md).
 The ID is claimed when the item is written and stays with it through the commit
 that closes it; the priority changes, the ID never does.
 
-(Nothing open yet.)
+- **[P1] JEEVES-2** — Verify the sort-by-sender button in a real Gmail inbox.
+  JEEVES-1 shipped untested in a browser: it's a port of a script drafted in
+  a separate conversation, and the row/sender selectors (`tr.zA`,
+  `.yW span[name/email]`) are Gmail's real but undocumented markup, never
+  confirmed against a live page. Install the script for real and confirm
+  the button appears, sorts correctly, and survives Gmail's own re-renders
+  before trusting it.

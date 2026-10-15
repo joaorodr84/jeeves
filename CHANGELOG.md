@@ -11,3 +11,12 @@ version, newest first.
 
 Open work is tracked in [TODO.md](TODO.md), and registered by ID in
 [TASKS.md](TASKS.md).
+
+## [0.2.0]
+
+### Added
+
+- A "Sort by sender" button next to Gmail's search bar, which sorts the
+  inbox rows currently loaded on the page alphabetically by sender name,
+  falling back to the sender's email address when no display name is
+  available.
