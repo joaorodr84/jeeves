@@ -1,0 +1,8 @@
+{
+  "name": "jeeves",
+  "private": true,
+  "description": "Tampermonkey userscript that sorts a Gmail inbox by sender — test tooling only, the script itself has no build step.",
+  "scripts": {
+    "test": "node --test"
+  }
+}
