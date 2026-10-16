@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jeeves
 // @namespace    https://github.com/joaorodr84/jeeves
-// @version      0.4.0
+// @version      0.5.0
 // @description  Adds a toolbar button to Gmail that sorts the currently loaded inbox rows by sender.
 // @author       Joao Rodrigues
 // @match        https://mail.google.com/mail/*
@@ -37,6 +37,25 @@
     return '';
   }
 
+  // Collapses consecutive rows sharing a sender into groups. Pure and
+  // DOM-free (via getSenderKey), so it's unit-tested the same way as
+  // getSenderKey and isSorted. Only meaningful once rows are sorted:
+  // grouping by mere adjacency is why this runs after sortInbox(), never
+  // instead of it.
+  function groupBySender(rows) {
+    const groups = [];
+    rows.forEach(row => {
+      const key = getSenderKey(row);
+      const last = groups[groups.length - 1];
+      if (last && last.key === key) {
+        last.rows.push(row);
+      } else {
+        groups.push({ key, rows: [row] });
+      }
+    });
+    return groups;
+  }
+
   // True once every row is already in sender order. Used both to skip a
   // no-op reorder on manual clicks and, more importantly, to stop the
   // auto-resort (below) from looping: re-appending nodes via a
@@ -68,6 +87,107 @@
   // only kicks in after that — otherwise every inbox would get
   // force-sorted on load whether or not sorting was ever requested.
   let sortEnabled = false;
+
+  const GROUP_CHECKBOX_CLASS = 'jeeves-group-checkbox';
+
+  // Gmail exposes each row's own selection checkbox with the standard
+  // ARIA checkbox role. We read and drive that checkbox directly rather
+  // than tracking selection ourselves, because Gmail keeps row selection
+  // in its own internal state (what bulk actions like delete/archive
+  // actually read), not just the checkbox's visual appearance — a group
+  // checkbox that only looked selected without updating that internal
+  // state would silently fail to select anything for those actions.
+  function getRowCheckbox(row) {
+    return row.querySelector('div[role="checkbox"]');
+  }
+
+  function isRowSelected(row) {
+    const checkbox = getRowCheckbox(row);
+    return !!checkbox && checkbox.getAttribute('aria-checked') === 'true';
+  }
+
+  // One checkbox per sender group, inserted into the first row's sender
+  // cell. Clicking it dispatches a real click on every row's own
+  // checkbox (see getRowCheckbox) instead of flipping an attribute,
+  // which is what actually drives Gmail's internal selection.
+  function buildGroupCheckbox(rows) {
+    const checkbox = document.createElement('div');
+    checkbox.className = GROUP_CHECKBOX_CLASS;
+    checkbox.setAttribute('role', 'checkbox');
+    checkbox.setAttribute('tabindex', '0');
+    checkbox.setAttribute('aria-label', 'Select all emails from this sender');
+    checkbox.style.cssText = [
+      'display:inline-block',
+      'width:14px',
+      'height:14px',
+      'margin-right:6px',
+      'border:1.5px solid currentColor',
+      'border-radius:2px',
+      'cursor:pointer',
+      'vertical-align:middle',
+      'flex:none'
+    ].join(';');
+
+    const sync = () => {
+      const allSelected = rows.every(isRowSelected);
+      checkbox.setAttribute('aria-checked', String(allSelected));
+      checkbox.style.background = allSelected ? 'currentColor' : 'transparent';
+    };
+
+    const toggle = () => {
+      // Select everything if not all rows are selected yet, otherwise
+      // clear the whole group — the usual "select all" checkbox
+      // convention, where anything short of fully-selected means the
+      // next click selects all.
+      const target = !rows.every(isRowSelected);
+      rows.forEach(row => {
+        if (isRowSelected(row) === target) return;
+        const native = getRowCheckbox(row);
+        if (native) native.click();
+      });
+      sync();
+    };
+
+    checkbox.addEventListener('click', toggle);
+    checkbox.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggle();
+      }
+    });
+
+    sync();
+    return checkbox;
+  }
+
+  // Adds a group checkbox to every sender group of 2+ rows, removing any
+  // that no longer apply. Skips entirely when the DOM already reflects
+  // the current grouping — not just an optimization: inserting/removing
+  // elements counts as a childList mutation, so without this check our
+  // own checkboxes would re-trigger the MutationObserver that calls this
+  // function, forever, the same way isSorted() guards sortInbox().
+  function applyGrouping() {
+    const rows = getRows();
+    const groups = groupBySender(rows).filter(group => group.rows.length > 1);
+
+    const desiredFirstRows = new Set(groups.map(group => group.rows[0]));
+    const currentFirstRows = new Set(
+      Array.from(document.querySelectorAll(`.${GROUP_CHECKBOX_CLASS}`))
+        .map(el => el.closest('tr.zA'))
+    );
+    const alreadyApplied = currentFirstRows.size === desiredFirstRows.size &&
+      [...desiredFirstRows].every(row => currentFirstRows.has(row));
+    if (alreadyApplied) return;
+
+    currentFirstRows.forEach(row => {
+      const stale = row && row.querySelector(`.${GROUP_CHECKBOX_CLASS}`);
+      if (stale) stale.remove();
+    });
+    groups.forEach(group => {
+      const senderCell = group.rows[0].querySelector('.yW');
+      if (senderCell) senderCell.insertBefore(buildGroupCheckbox(group.rows), senderCell.firstChild);
+    });
+  }
 
   // Gmail marks its main list toolbar (the row with the select-all
   // checkbox, refresh, and the "More" overflow menu) with gh="tm". Unlike
@@ -180,6 +300,7 @@
     const triggerSort = () => {
       sortEnabled = true;
       sortInbox();
+      applyGrouping();
     };
     btn.addEventListener('click', triggerSort);
     btn.addEventListener('keydown', (event) => {
@@ -193,15 +314,19 @@
   // Gmail is a single-page app that constantly re-renders parts of the
   // DOM, so we keep checking that our button is still there and re-add
   // it if Gmail wiped it out. Once sorting has been requested, the same
-  // observer also re-applies the sort: opening, deleting, or archiving a
-  // message makes Gmail redraw the row list from its own (date-ordered)
-  // model, which would otherwise silently undo the sort. sortInbox()'s
-  // own isSorted() check keeps this from looping on the mutations the
-  // resort itself causes.
+  // observer also re-applies the sort and the sender grouping: opening,
+  // deleting, or archiving a message makes Gmail redraw the row list from
+  // its own (date-ordered) model, which would otherwise silently undo
+  // both. sortInbox()'s isSorted() check and applyGrouping()'s own
+  // already-applied check keep this from looping on the mutations each
+  // one causes.
   if (typeof document !== 'undefined') {
     const observer = new MutationObserver(() => {
       addButton();
-      if (sortEnabled) sortInbox();
+      if (sortEnabled) {
+        sortInbox();
+        applyGrouping();
+      }
     });
     observer.observe(document.body, { childList: true, subtree: true });
     addButton();
@@ -211,6 +336,6 @@
   // Node test suite under test/ — everything else here needs a real
   // Gmail page and is exercised manually per CLAUDE.md's Tests section.
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { getSenderKey, isSorted };
+    module.exports = { getSenderKey, isSorted, groupBySender };
   }
 })();

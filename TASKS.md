@@ -29,8 +29,7 @@ git log --oneline | grep -oE 'JEEVES-[0-9]+' | sort -t- -k2 -n | tail -1
 
 | ID | Task | Status | Commit |
 | --- | --- | --- | --- |
-| JEEVES-2 | Verify the sort-by-sender button in a real Gmail inbox | open | — |
-| JEEVES-6 | Group emails by sender with a per-group select-all checkbox | open | — |
+| JEEVES-2 | Verify the full feature set in a real Gmail inbox | open | — |
 
 ## Done
 
@@ -40,3 +39,4 @@ git log --oneline | grep -oE 'JEEVES-[0-9]+' | sort -t- -k2 -n | tail -1
 | JEEVES-3 | Move the sort-by-sender button into Gmail's own toolbar, styled natively | done | 2026-10-17 | — |
 | JEEVES-4 | Position the sort button group next to Gmail's own toolbar button group | done | 2026-10-17 | — |
 | JEEVES-5 | Make the sender sort persist across Gmail's own re-renders (open/delete/archive) | done | 2026-10-17 | — |
+| JEEVES-6 | Group emails by sender with a per-group select-all checkbox | done | 2026-10-17 | — |

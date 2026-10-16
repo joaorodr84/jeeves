@@ -1,6 +1,6 @@
 const assert = require('node:assert');
 const { test } = require('node:test');
-const { getSenderKey, isSorted } = require('../jeeves.user.js');
+const { getSenderKey, isSorted, groupBySender } = require('../jeeves.user.js');
 
 // Minimal stand-in for the DOM element getSenderKey reads from — a row
 // with a querySelector that returns a sender span with name/email
@@ -60,4 +60,30 @@ test('isSorted is false when a later row sorts before an earlier one', () => {
 test('isSorted is true for fewer than two rows', () => {
   assert.strictEqual(isSorted([]), true);
   assert.strictEqual(isSorted([fakeRow({ name: 'Ada' })]), true);
+});
+
+// groupBySender only collapses *consecutive* rows — it's meant to run
+// after sortInbox() has already put same-sender rows next to each other,
+// not to find every sender's rows wherever they sit in the list.
+
+test('groupBySender collapses consecutive rows from the same sender', () => {
+  const ada1 = fakeRow({ name: 'Ada' });
+  const ada2 = fakeRow({ name: 'Ada' });
+  const bob = fakeRow({ name: 'Bob' });
+  const groups = groupBySender([ada1, ada2, bob]);
+  assert.strictEqual(groups.length, 2);
+  assert.deepStrictEqual(groups[0], { key: 'ada', rows: [ada1, ada2] });
+  assert.deepStrictEqual(groups[1], { key: 'bob', rows: [bob] });
+});
+
+test('groupBySender treats non-adjacent rows from the same sender as separate groups', () => {
+  const ada1 = fakeRow({ name: 'Ada' });
+  const bob = fakeRow({ name: 'Bob' });
+  const ada2 = fakeRow({ name: 'Ada' });
+  const groups = groupBySender([ada1, bob, ada2]);
+  assert.strictEqual(groups.length, 3);
+});
+
+test('groupBySender returns no groups for an empty row list', () => {
+  assert.deepStrictEqual(groupBySender([]), []);
 });

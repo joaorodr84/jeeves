@@ -17,21 +17,16 @@ Every item also carries a `JEEVES-<n>` ID, registered in [TASKS.md](TASKS.md).
 The ID is claimed when the item is written and stays with it through the commit
 that closes it; the priority changes, the ID never does.
 
-- **[P1] JEEVES-2** — Verify the sort-by-sender button in a real Gmail inbox.
-  JEEVES-1 shipped untested in a browser: it's a port of a script drafted in
-  a separate conversation, and the row/sender selectors (`tr.zA`,
-  `.yW span[name/email]`) are Gmail's real but undocumented markup, never
-  confirmed against a live page. Install the script for real and confirm
-  the button appears, sorts correctly, and survives Gmail's own re-renders
-  before trusting it.
-
-- **[P3] JEEVES-6** — Group emails by sender, with a checkbox per group
-  that selects every row for that sender; keep the existing per-row
-  checkboxes alongside it. Builds on the existing sort (groups only make
-  sense once rows are sender-ordered). Open design question to resolve
-  before implementing: Gmail tracks row selection in its own internal
-  state, not just the checkbox's visual `checked` attribute — ticking a
-  group checkbox will need to drive Gmail's real selection (e.g. by
-  dispatching clicks on each row's own checkbox) for bulk actions like
-  delete/archive to actually pick up the selected rows, not just fake
-  the visual state.
+- **[P1] JEEVES-2** — Verify the full feature set in a real Gmail inbox.
+  JEEVES-1, -3, -4, -5, and -6 all shipped untested in a browser — ported
+  from scripts drafted and reasoned about outside a live Gmail session,
+  resting on selectors (`tr.zA`, `.yW span[name/email]`, `div[gh="tm"]`,
+  `div[role="checkbox"]`) that are Gmail's real but undocumented markup,
+  never confirmed against a live page. Install the script for real and
+  confirm: the button appears in Gmail's own toolbar, next to its
+  button group (not off on its own); a click sorts the loaded rows by
+  sender; the sort survives Gmail's own re-renders (open/delete/archive
+  a message and check it stays sorted); and once sorted, each sender
+  with 2+ messages shows a group checkbox that selects/deselects every
+  row for that sender and actually works with bulk delete/archive (not
+  just a cosmetic checked state) — before trusting any of it.
