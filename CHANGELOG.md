@@ -12,6 +12,16 @@ version, newest first.
 Open work is tracked in [TODO.md](TODO.md), and registered by ID in
 [TASKS.md](TASKS.md).
 
+## [0.3.0]
+
+### Changed
+
+- The "Sort by sender" button now lives inside Gmail's own list toolbar
+  (the row with the select-all checkbox, refresh, and "More"), in its own
+  button group, styled to match Gmail's native icon buttons and whichever
+  theme — light, dark, or a custom one — is active. It falls back to the
+  previous search-bar placement if Gmail's toolbar can't be found.
+
 ## [0.2.0]
 
 ### Added

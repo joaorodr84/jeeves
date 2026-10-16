@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jeeves
 // @namespace    https://github.com/joaorodr84/jeeves
-// @version      0.2.0
+// @version      0.3.0
 // @description  Adds a toolbar button to Gmail that sorts the currently loaded inbox rows by sender.
 // @author       Joao Rodrigues
 // @match        https://mail.google.com/mail/*
@@ -14,6 +14,7 @@
   'use strict';
 
   const BUTTON_ID = 'jeeves-sort-by-sender-btn';
+  const GROUP_ID = 'jeeves-button-group';
 
   // Gmail's thread rows. "zA" has been the row class in Gmail's standard
   // HTML for a long time, but Google doesn't document this and it can
@@ -50,33 +51,103 @@
     tbody.appendChild(frag);
   }
 
+  // Gmail marks its main list toolbar (the row with the select-all
+  // checkbox, refresh, and the "More" overflow menu) with gh="tm". Unlike
+  // class names, which Gmail rewrites across visual refreshes, this
+  // attribute has stayed put for years and is what other Gmail
+  // userscripts anchor on for the same reason.
+  function findToolbar() {
+    return document.querySelector('div[gh="tm"]');
+  }
+
+  // A plain up/down sort glyph, drawn inline so no icon font or sprite
+  // sheet is needed. currentColor picks up whatever color Gmail's own
+  // button classes set for the active theme (light, dark, or a custom
+  // one), once those classes are copied onto the button below.
+  function buildSortIcon() {
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '20');
+    svg.setAttribute('height', '20');
+    svg.style.fill = 'currentColor';
+    svg.style.pointerEvents = 'none';
+    const path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', 'M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z');
+    svg.appendChild(path);
+    return svg;
+  }
+
   function addButton() {
     if (document.getElementById(BUTTON_ID)) return;
 
-    // The search bar's row is a reasonably stable place to anchor a
-    // custom button without fighting Gmail's own toolbar re-renders.
-    const searchBar = document.querySelector('form[role="search"]');
-    if (!searchBar || !searchBar.parentElement) return;
+    const toolbar = findToolbar();
+    // Fall back to the old search-bar anchor if gh="tm" ever stops
+    // matching (Gmail markup is undocumented, see CLAUDE.md) so the
+    // button degrades instead of silently disappearing.
+    const fallbackParent = !toolbar && document.querySelector('form[role="search"]');
+    if (!toolbar && !(fallbackParent && fallbackParent.parentElement)) return;
 
-    const btn = document.createElement('button');
+    const btn = document.createElement('div');
     btn.id = BUTTON_ID;
-    btn.textContent = 'Sort by sender';
+    btn.setAttribute('role', 'button');
+    btn.setAttribute('tabindex', '0');
     btn.title = 'Jeeves: sort the currently loaded inbox rows by sender (one page / ~50 at a time)';
-    btn.style.cssText = [
-      'margin-left:12px',
-      'padding:6px 14px',
-      'border:1px solid #dadce0',
-      'border-radius:16px',
-      'background:#fff',
-      'color:#444',
-      'font-size:13px',
-      'cursor:pointer'
-    ].join(';');
-    btn.addEventListener('mouseenter', () => btn.style.background = '#f1f3f4');
-    btn.addEventListener('mouseleave', () => btn.style.background = '#fff');
-    btn.addEventListener('click', sortInbox);
+    btn.setAttribute('aria-label', 'Sort by sender');
+    btn.appendChild(buildSortIcon());
 
-    searchBar.parentElement.appendChild(btn);
+    if (toolbar) {
+      // Gmail's own icon buttons (refresh, more) carry classes that
+      // drive their hover circle and theme colors; Gmail's CSS targets
+      // those classes, not element identity. Copying just the class
+      // list (not cloning the node) gets pixel-matching, theme-aware
+      // styling for free, without carrying over the template's
+      // `jsaction` attribute, which would otherwise make Gmail's own
+      // click delegation fire the template's action (e.g. refresh) on
+      // top of ours.
+      const template = toolbar.querySelector('[role="button"]');
+      if (template) btn.className = template.className;
+      btn.removeAttribute('jsaction');
+
+      const group = document.createElement('div');
+      group.id = GROUP_ID;
+      group.setAttribute('role', 'group');
+      group.style.cssText = [
+        'display:flex',
+        'align-items:center',
+        'margin-left:8px',
+        'padding-left:8px',
+        // A hairline divider like the ones between Gmail's own toolbar
+        // groups, in a translucent currentColor so it reads correctly
+        // on light and dark themes alike without a hardcoded grey.
+        'border-left:1px solid color-mix(in srgb, currentColor 24%, transparent)'
+      ].join(';');
+      group.appendChild(btn);
+      toolbar.appendChild(group);
+    } else {
+      // Fallback styling approximates Gmail's light-theme pill buttons;
+      // there's no native template to copy from outside the toolbar.
+      btn.style.cssText = [
+        'margin-left:12px',
+        'padding:6px 14px',
+        'border:1px solid #dadce0',
+        'border-radius:16px',
+        'background:#fff',
+        'color:#444',
+        'font-size:13px',
+        'cursor:pointer',
+        'display:inline-flex'
+      ].join(';');
+      fallbackParent.parentElement.appendChild(btn);
+    }
+
+    btn.addEventListener('click', sortInbox);
+    btn.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        sortInbox();
+      }
+    });
   }
 
   // Gmail is a single-page app that constantly re-renders parts of the
