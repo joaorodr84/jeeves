@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jeeves
 // @namespace    https://github.com/joaorodr84/jeeves
-// @version      0.3.1
+// @version      0.4.0
 // @description  Adds a toolbar button to Gmail that sorts the currently loaded inbox rows by sender.
 // @author       Joao Rodrigues
 // @match        https://mail.google.com/mail/*
@@ -37,9 +37,22 @@
     return '';
   }
 
+  // True once every row is already in sender order. Used both to skip a
+  // no-op reorder on manual clicks and, more importantly, to stop the
+  // auto-resort (below) from looping: re-appending nodes via a
+  // DocumentFragment moves them even when the end order is unchanged,
+  // which would otherwise re-trigger the MutationObserver on every
+  // automatic resort, forever.
+  function isSorted(rows) {
+    for (let i = 1; i < rows.length; i++) {
+      if (getSenderKey(rows[i - 1]).localeCompare(getSenderKey(rows[i])) > 0) return false;
+    }
+    return true;
+  }
+
   function sortInbox() {
     const rows = getRows();
-    if (rows.length < 2) return;
+    if (rows.length < 2 || isSorted(rows)) return;
 
     const tbody = rows[0].parentElement;
     const sorted = rows.slice().sort((a, b) => getSenderKey(a).localeCompare(getSenderKey(b)));
@@ -50,6 +63,11 @@
     sorted.forEach(row => frag.appendChild(row));
     tbody.appendChild(frag);
   }
+
+  // Set once the user has asked for a sort, so the auto-resort (below)
+  // only kicks in after that — otherwise every inbox would get
+  // force-sorted on load whether or not sorting was ever requested.
+  let sortEnabled = false;
 
   // Gmail marks its main list toolbar (the row with the select-all
   // checkbox, refresh, and the "More" overflow menu) with gh="tm". Unlike
@@ -159,20 +177,32 @@
       fallbackParent.parentElement.appendChild(btn);
     }
 
-    btn.addEventListener('click', sortInbox);
+    const triggerSort = () => {
+      sortEnabled = true;
+      sortInbox();
+    };
+    btn.addEventListener('click', triggerSort);
     btn.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
-        sortInbox();
+        triggerSort();
       }
     });
   }
 
   // Gmail is a single-page app that constantly re-renders parts of the
   // DOM, so we keep checking that our button is still there and re-add
-  // it if Gmail wiped it out.
+  // it if Gmail wiped it out. Once sorting has been requested, the same
+  // observer also re-applies the sort: opening, deleting, or archiving a
+  // message makes Gmail redraw the row list from its own (date-ordered)
+  // model, which would otherwise silently undo the sort. sortInbox()'s
+  // own isSorted() check keeps this from looping on the mutations the
+  // resort itself causes.
   if (typeof document !== 'undefined') {
-    const observer = new MutationObserver(() => addButton());
+    const observer = new MutationObserver(() => {
+      addButton();
+      if (sortEnabled) sortInbox();
+    });
     observer.observe(document.body, { childList: true, subtree: true });
     addButton();
   }
@@ -181,6 +211,6 @@
   // Node test suite under test/ — everything else here needs a real
   // Gmail page and is exercised manually per CLAUDE.md's Tests section.
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { getSenderKey };
+    module.exports = { getSenderKey, isSorted };
   }
 })();

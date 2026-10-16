@@ -25,15 +25,6 @@ that closes it; the priority changes, the ID never does.
   the button appears, sorts correctly, and survives Gmail's own re-renders
   before trusting it.
 
-- **[P2] JEEVES-5** — Make the sender sort persist across Gmail's own
-  re-renders. `sortInbox()` is a one-shot DOM reorder; opening an email,
-  deleting it, or archiving it makes Gmail redraw the row list from its
-  own internal (date-ordered) model, undoing the sort. The existing
-  `MutationObserver` only re-adds the button if it's missing, it doesn't
-  re-apply the sort. Needs the observer to detect row-set changes and
-  re-sort automatically, with a guard against re-triggering itself via
-  the reorder it just performed.
-
 - **[P3] JEEVES-6** — Group emails by sender, with a checkbox per group
   that selects every row for that sender; keep the existing per-row
   checkboxes alongside it. Builds on the existing sort (groups only make
