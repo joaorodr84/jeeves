@@ -25,11 +25,6 @@ that closes it; the priority changes, the ID never does.
   the button appears, sorts correctly, and survives Gmail's own re-renders
   before trusting it.
 
-- **[P2] JEEVES-4** — Position the sort button group next to Gmail's own
-  toolbar button group. Right now it lands elsewhere in the toolbar; it
-  should sit immediately to the right of the existing checkbox/refresh/
-  more-options group, not off on its own.
-
 - **[P2] JEEVES-5** — Make the sender sort persist across Gmail's own
   re-renders. `sortInbox()` is a one-shot DOM reorder; opening an email,
   deleting it, or archiving it makes Gmail redraw the row list from its

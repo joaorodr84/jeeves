@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jeeves
 // @namespace    https://github.com/joaorodr84/jeeves
-// @version      0.3.0
+// @version      0.3.1
 // @description  Adds a toolbar button to Gmail that sorts the currently loaded inbox rows by sender.
 // @author       Joao Rodrigues
 // @match        https://mail.google.com/mail/*
@@ -123,7 +123,25 @@
         'border-left:1px solid color-mix(in srgb, currentColor 24%, transparent)'
       ].join(';');
       group.appendChild(btn);
-      toolbar.appendChild(group);
+
+      // toolbar (div[gh="tm"]) lays out its own button group and the
+      // "1-50 of 1,234" pagination controls as side-by-side top-level
+      // children (flex, space-between). Appending straight to toolbar
+      // put our group after whichever of those happened to be last in
+      // the DOM — in practice, past the pagination controls, not next
+      // to the buttons. Instead, walk up from the template button to
+      // the toolbar's direct child that contains it, and insert right
+      // after that child, so our group sits immediately next to
+      // Gmail's own button group regardless of what else shares the row.
+      let anchor = template;
+      while (anchor && anchor.parentElement !== toolbar) {
+        anchor = anchor.parentElement;
+      }
+      if (anchor) {
+        anchor.after(group);
+      } else {
+        toolbar.appendChild(group);
+      }
     } else {
       // Fallback styling approximates Gmail's light-theme pill buttons;
       // there's no native template to copy from outside the toolbar.
