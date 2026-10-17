@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jeeves
 // @namespace    https://github.com/joaorodr84/jeeves
-// @version      0.5.0
+// @version      0.5.1
 // @description  Adds a toolbar button to Gmail that sorts the currently loaded inbox rows by sender.
 // @author       Joao Rodrigues
 // @match        https://mail.google.com/mail/*
@@ -106,10 +106,14 @@
     return !!checkbox && checkbox.getAttribute('aria-checked') === 'true';
   }
 
-  // One checkbox per sender group, inserted into the first row's sender
-  // cell. Clicking it dispatches a real click on every row's own
-  // checkbox (see getRowCheckbox) instead of flipping an attribute,
-  // which is what actually drives Gmail's internal selection.
+  // One checkbox per sender group. Clicking it dispatches a real click
+  // on every row's own checkbox (see getRowCheckbox) instead of
+  // flipping an attribute, which is what actually drives Gmail's
+  // internal selection. Lives in its own header row (see
+  // buildGroupHeaderRow), not inside an email row: the first attempt
+  // put it in the first row's sender cell, which meant a slightly
+  // mis-aimed click could land on Gmail's own row-click handler and
+  // open that email instead of toggling the checkbox.
   function buildGroupCheckbox(rows) {
     const checkbox = document.createElement('div');
     checkbox.className = GROUP_CHECKBOX_CLASS;
@@ -160,32 +164,65 @@
     return checkbox;
   }
 
-  // Adds a group checkbox to every sender group of 2+ rows, removing any
-  // that no longer apply. Skips entirely when the DOM already reflects
-  // the current grouping — not just an optimization: inserting/removing
-  // elements counts as a childList mutation, so without this check our
-  // own checkboxes would re-trigger the MutationObserver that calls this
-  // function, forever, the same way isSorted() guards sortInbox().
+  const GROUP_HEADER_CLASS = 'jeeves-group-header';
+
+  // A standalone <tr> holding just the group checkbox and a short label,
+  // inserted before a sender group's first row rather than into it. It
+  // has none of Gmail's own row classes or jsaction attributes, so a
+  // click anywhere in it only ever reaches our own checkbox handler —
+  // never Gmail's row-click-to-open behavior. getRows() filters on
+  // `tr.zA`, which this row deliberately doesn't have, so it's invisible
+  // to sorting and grouping.
+  function buildGroupHeaderRow(rows) {
+    const tr = document.createElement('tr');
+    tr.className = GROUP_HEADER_CLASS;
+
+    const td = document.createElement('td');
+    // Comfortably more than Gmail's row will ever have; browsers clamp
+    // colspan to the table's real column count, spanning the full width
+    // without needing to count Gmail's own (undocumented) columns.
+    td.setAttribute('colspan', '100');
+    td.style.cssText = [
+      'display:flex',
+      'align-items:center',
+      'padding:4px 8px',
+      'font-size:12px',
+      'color:inherit',
+      'opacity:0.75'
+    ].join(';');
+
+    td.appendChild(buildGroupCheckbox(rows));
+
+    const label = document.createElement('span');
+    label.textContent = `${rows.length} from this sender`;
+    label.style.marginLeft = '6px';
+    td.appendChild(label);
+
+    tr.appendChild(td);
+    return tr;
+  }
+
+  // Adds a group header row before every sender group of 2+ rows,
+  // removing any that no longer apply. Skips entirely when the DOM
+  // already reflects the current grouping — not just an optimization:
+  // inserting/removing rows counts as a childList mutation, so without
+  // this check our own header rows would re-trigger the
+  // MutationObserver that calls this function, forever, the same way
+  // isSorted() guards sortInbox().
   function applyGrouping() {
     const rows = getRows();
     const groups = groupBySender(rows).filter(group => group.rows.length > 1);
 
-    const desiredFirstRows = new Set(groups.map(group => group.rows[0]));
-    const currentFirstRows = new Set(
-      Array.from(document.querySelectorAll(`.${GROUP_CHECKBOX_CLASS}`))
-        .map(el => el.closest('tr.zA'))
-    );
-    const alreadyApplied = currentFirstRows.size === desiredFirstRows.size &&
-      [...desiredFirstRows].every(row => currentFirstRows.has(row));
+    const headerCount = document.querySelectorAll(`.${GROUP_HEADER_CLASS}`).length;
+    const alreadyApplied = headerCount === groups.length && groups.every(group => {
+      const prev = group.rows[0].previousElementSibling;
+      return prev && prev.classList.contains(GROUP_HEADER_CLASS);
+    });
     if (alreadyApplied) return;
 
-    currentFirstRows.forEach(row => {
-      const stale = row && row.querySelector(`.${GROUP_CHECKBOX_CLASS}`);
-      if (stale) stale.remove();
-    });
+    document.querySelectorAll(`.${GROUP_HEADER_CLASS}`).forEach(el => el.remove());
     groups.forEach(group => {
-      const senderCell = group.rows[0].querySelector('.yW');
-      if (senderCell) senderCell.insertBefore(buildGroupCheckbox(group.rows), senderCell.firstChild);
+      group.rows[0].parentElement.insertBefore(buildGroupHeaderRow(group.rows), group.rows[0]);
     });
   }
 

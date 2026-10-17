@@ -3,7 +3,7 @@
 Every task carries an ID of the form `JEEVES-<n>`. IDs are assigned once, never
 reused, and never renumbered.
 
-**Next ID to assign: `JEEVES-7`**
+**Next ID to assign: `JEEVES-8`**
 
 If this file and history ever disagree, history wins:
 
@@ -40,3 +40,4 @@ git log --oneline | grep -oE 'JEEVES-[0-9]+' | sort -t- -k2 -n | tail -1
 | JEEVES-4 | Position the sort button group next to Gmail's own toolbar button group | done | 2026-10-17 | — |
 | JEEVES-5 | Make the sender sort persist across Gmail's own re-renders (open/delete/archive) | done | 2026-10-17 | — |
 | JEEVES-6 | Group emails by sender with a per-group select-all checkbox | done | 2026-10-17 | — |
+| JEEVES-7 | Move the group-select checkbox out of the email row into its own header row | done | 2026-10-17 | — |
