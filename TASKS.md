@@ -3,7 +3,7 @@
 Every task carries an ID of the form `JEEVES-<n>`. IDs are assigned once, never
 reused, and never renumbered.
 
-**Next ID to assign: `JEEVES-8`**
+**Next ID to assign: `JEEVES-11`**
 
 If this file and history ever disagree, history wins:
 
@@ -30,6 +30,9 @@ git log --oneline | grep -oE 'JEEVES-[0-9]+' | sort -t- -k2 -n | tail -1
 | ID | Task | Status | Commit |
 | --- | --- | --- | --- |
 | JEEVES-2 | Verify the full feature set in a real Gmail inbox | open | — |
+| JEEVES-8 | Fetch the inbox via the Gmail API | open | — |
+| JEEVES-9 | Group the API-fetched inbox by sender | open | — |
+| JEEVES-10 | Apply a Gmail label via the API | open | — |
 
 ## Done
 

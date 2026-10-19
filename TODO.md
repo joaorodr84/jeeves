@@ -30,3 +30,24 @@ that closes it; the priority changes, the ID never does.
   with 2+ messages shows a group checkbox that selects/deselects every
   row for that sender and actually works with bulk delete/archive (not
   just a cosmetic checked state) — before trusting any of it.
+
+- **[P4] JEEVES-8** — Fetch the inbox via the Gmail API. First step of the
+  planned move from a Tampermonkey userscript scraping Gmail's DOM to a
+  web app driven by the Gmail API (`messages.list` then `messages.get`).
+  Needs a Google OAuth 2.0 consent flow first, requesting only
+  `gmail.modify` (covers read/label/archive without full `gmail.full`
+  access), with token exchange and refresh handled by a thin backend or
+  serverless function — never client-side. Get the OAuth flow solid
+  before investing in any UI.
+
+- **[P4] JEEVES-9** — Group the API-fetched inbox by sender. Reuses the
+  existing, already-tested sender-key logic from the userscript, adapted
+  to run against JSON from `messages.get` instead of scraped `tr.zA` DOM
+  rows. Depends on JEEVES-8.
+
+- **[P4] JEEVES-10** — Apply a Gmail label to a group of messages via
+  `messages.modify`, using `labels.list`/`labels.create` to map in-app
+  groupings onto real Gmail labels. Gmail has no true folders — everything
+  is labels, so this one API also covers "move to a different directory"
+  (e.g. archiving is just removing the `INBOX` label); a dedicated
+  "move to folder" UI is deferred past this MVP. Depends on JEEVES-9.
